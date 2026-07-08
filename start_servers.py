@@ -1,207 +1,73 @@
-# start_servers.py
-import subprocess
-import time
+# app.py
 import os
 import sys
-import signal
-import webbrowser
+import threading
+import time
 
+# Add current directory to path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def print_banner():
-    """Print deployment banner"""
-    print("\n" + "=" * 70)
-    print("  🌍 TANZANIA CLIMATE RISK DASHBOARD")
-    print("=" * 70)
-    print("  📊 Deploying Dash Notebooks (No Conversion)")
-    print("=" * 70 + "\n")
+# ============================================
+# IMPORT BOTH DASHBOARDS
+# ============================================
 
+# Dashboard 1: Main Navigation (Port 8050)
+from app_risk import app as app_risk
 
-def check_notebooks(notebooks):
-    """Check if all notebooks exist"""
-    missing = []
-    for notebook, _ in notebooks:
-        if not os.path.exists(notebook):
-            missing.append(notebook)
+# Dashboard 2: Risk Calculator (Port 8051)
+from prediction import app as prediction_app
 
-    if missing:
-        print("❌ ERROR: Missing notebooks:")
-        for nb in missing:
-            print(f"   - {nb}")
-        return False
-    return True
+# ============================================
+# MULTI-APP DISPATCHER
+# ============================================
 
+# Create a Flask dispatcher that routes to both apps
+from flask import Flask, request, redirect
 
-def run_notebook(notebook, port):
-    """
-    Run a Jupyter notebook as a Dash server using IPython.
-    The notebook executes and app.run() keeps it running.
-    """
-    print(f"  🚀 Starting: {notebook} (Port {port})")
+# Get port from environment variable (Render sets this)
+PORT = int(os.environ.get("PORT", 8050))
 
-    # Method: Use IPython to execute the notebook
-    # This preserves all imports and runs the notebook exactly as-is
-    cmd = [
-        'ipython',
-        '-c',
-        f"""
-import sys
-sys.path.append('.')
-exec(open('{notebook}').read())
-"""
-    ]
+# Create a dispatcher app
+app = Flask(__name__)
 
-    # Start the process
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
+# Mount both Dash apps at different routes
+# We'll use a simple dispatcher based on the path
 
-    return proc
+@app.route('/')
+def home():
+    return redirect('/dashboard1')
 
+@app.route('/dashboard1')
+def dashboard1():
+    # Serve app_risk
+    return app_risk.server.full_dispatch_request()
 
-def run_notebook_with_python(notebook, port):
-    """
-    Alternative: Use Python directly (no IPython needed)
-    """
-    print(f"  🚀 Starting: {notebook} (Port {port})")
+@app.route('/dashboard2')
+def dashboard2():
+    # Serve prediction
+    return prediction_app.server.full_dispatch_request()
 
-    cmd = [
-        'python',
-        '-c',
-        f"""
-import sys
-sys.path.append('.')
-exec(open('{notebook}').read())
-"""
-    ]
+# For Gunicorn
+server = app
 
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-
-    return proc
-
-
-def check_server(port, timeout=15):
-    """
-    Check if a server is running on the given port
-    """
-    import socket
-    start_time = time.time()
-
-    while time.time() - start_time < timeout:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(1)
-            result = sock.connect_ex(('127.0.0.1', port))
-            sock.close()
-            if result == 0:
-                return True
-        except:
-            pass
-        time.sleep(1)
-
-    return False
-
-
-def stop_processes(processes):
-    """Stop all running processes gracefully"""
-    print("\n🛑 Shutting down servers...")
-
-    for proc in processes:
-        if proc.poll() is None:  # Still running
-            proc.terminate()
-
-    # Give them time to terminate
-    time.sleep(2)
-
-    # Force kill if still running
-    for proc in processes:
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait()
-
-    print("✅ All servers stopped.\n")
-
-
-def open_browser():
-    """Open browser to the dashboards"""
-    time.sleep(3)
-    webbrowser.open("http://127.0.0.1:8050")
-
-
-if __name__ == "__main__":
-    # ============================================================
-    # CONFIGURATION: Edit these if your files are named differently
-    # ============================================================
-    notebooks = [
-        ("app_risk.ipynb", 8050, "Main Dashboard"),
-        ("prediction.ipynb", 8051, "Risk Calculator")
-    ]
-    # ============================================================
-
-    print_banner()
-
-    # Check files exist
-    if not check_notebooks(notebooks):
-        print("\n💡 Make sure all .ipynb files are in the current directory.")
-        print("   Run this script from your project folder.\n")
-        sys.exit(1)
-
-    # Start each notebook
-    print("📦 Starting servers...\n")
-    processes = []
-
-    for notebook, port, name in notebooks:
-        # Use Python to execute (no IPython needed)
-        proc = run_notebook_with_python(notebook, port)
-        processes.append(proc)
-
-        # Wait for server to start
-        print(f"   ⏳ Waiting for {name} (Port {port})...")
-
-        if check_server(port, timeout=15):
-            print(f"   ✅ {name} is running on http://127.0.0.1:{port}")
-        else:
-            print(f"   ⚠️  {name} may not have started. Check logs.")
-
-        print()
-
-    # Open browser
-    try:
-        open_browser()
-    except:
-        pass
-
-    # Print final status
-    print("=" * 70)
-    print("  ✅ DEPLOYMENT COMPLETE")
-    print("=" * 70)
-    print("  📍 Access your dashboards:")
-    print()
-    for _, port, name in notebooks:
-        print(f"     • {name}: http://127.0.0.1:{port}")
-    print()
-    print("  🔗 The 'RISK CALC' button in Main Dashboard will")
-    print("     automatically open the Risk Calculator in a new tab.")
-    print("=" * 70)
-    print("\n  Press Ctrl+C to stop all servers.\n")
-
-    # Keep running
+if __name__ == '__main__':
+    # Run both servers in separate threads when running locally
+    def run_app_risk():
+        app_risk.run(host='0.0.0.0', port=8050, debug=False)
+    
+    def run_prediction():
+        prediction_app.run(host='0.0.0.0', port=8051, debug=False)
+    
+    t1 = threading.Thread(target=run_app_risk)
+    t2 = threading.Thread(target=run_prediction)
+    t1.daemon = True
+    t2.daemon = True
+    t1.start()
+    t2.start()
+    
+    # Keep main thread alive
     try:
         while True:
-            # Check if processes are still alive
-            for proc in processes:
-                if proc.poll() is not None:
-                    # Process died
-                    print(f"⚠️  A server stopped. Check logs.")
-                    # Restart? For now, we'll just wait
-            time.sleep(5)
+            time.sleep(1)
     except KeyboardInterrupt:
-        stop_processes(processes)
-        sys.exit(0)
+        print("\n[!] Shutting down...")
