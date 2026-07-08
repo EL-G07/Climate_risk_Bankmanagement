@@ -1,8 +1,8 @@
 # start_deploy.py
 import os
 import subprocess
-import time
 import sys
+import time
 
 def run_notebook(notebook_path, port, name):
     """
@@ -10,42 +10,36 @@ def run_notebook(notebook_path, port, name):
     """
     print(f"🚀 Starting {name} on port {port}...")
 
-    # 1. Read the notebook and fix the 'null' error
+    # 1. Fix the 'null' error
     try:
         with open(notebook_path, 'r') as f:
             content = f.read()
-        # Replace JavaScript 'null' with Python 'None'
         fixed_content = content.replace('null', 'None')
         print(f"   ✅ Fixed 'null' → 'None' in {notebook_path}")
     except FileNotFoundError:
         print(f"❌ Error: {notebook_path} not found.")
         return None
 
-    # 2. Write the fixed content to a temporary Python file
+    # 2. Write the fixed content
     temp_file = notebook_path.replace('.ipynb', '_fixed.py')
     with open(temp_file, 'w') as f:
         f.write(fixed_content)
 
-    # 3. Execute the fixed Python file with IPython and keep it alive
-    #    Using `-c` with `exec(open(...).read())` is unreliable for long-running processes.
-    #    Instead, we use `ipython` with the `-i` flag to keep the interpreter running.
-    #    However, the simplest and most reliable method is to use `python` directly.
-    #    Let's use `python` to execute the fixed script, as it's more predictable.
-    cmd = ['python', temp_file]
-
-    # 4. Start the subprocess and keep it alive
-    proc = subprocess.Popen(cmd)
+    # 3. Execute with Popen to keep it alive
+    cmd = ['python', temp_file]  # Use 'python' directly for more reliable execution
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
-    # Give the server time to start
-    time.sleep(8)
-    
-    # Check if the process is still running
-    if proc.poll() is None:
+    # 4. Wait a moment to see if it crashes immediately
+    time.sleep(5)
+    if proc.poll() is not None:
+        # Process has already exited. Get the error.
+        _, stderr = proc.communicate()
+        print(f"❌ {name} failed to start. Error:")
+        print(stderr.decode())
+        return None
+    else:
         print(f"✅ {name} is running on port {port}")
         return proc
-    else:
-        print(f"❌ {name} failed to start. Check the logs above.")
-        return None
 
 if __name__ == '__main__':
     print("\n" + "="*60)
@@ -72,7 +66,7 @@ if __name__ == '__main__':
 
     if not processes:
         print("\n❌ No servers started. Deployment failed.")
-        print("   Please check the error messages above.")
+        print("   Check the error messages above.")
         sys.exit(1)
 
     print("\n" + "="*60)
