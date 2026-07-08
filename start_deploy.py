@@ -6,7 +6,7 @@ import time
 
 def run_notebook(notebook_path, port, name):
     """
-    Executes a Jupyter notebook as a subprocess and keeps it running.
+    Executes a Jupyter notebook as a subprocess and captures output.
     """
     print(f"🚀 Starting {name} on port {port}...")
 
@@ -25,27 +25,42 @@ def run_notebook(notebook_path, port, name):
     with open(temp_file, 'w') as f:
         f.write(fixed_content)
 
-    # 3. Execute with Python directly (more reliable than ipython)
-    cmd = ['python', temp_file]
+    # 3. Execute the file with Python and capture all output
+    cmd = ['python', '-u', temp_file]  # -u for unbuffered output
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     
-    # Start the process
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # 4. Print output in real-time and check if it stays alive
+    start_time = time.time()
+    timeout = 10
+    output_lines = []
     
-    # 4. Wait a moment and check if it's still running
-    time.sleep(5)
-    if proc.poll() is not None:
-        # Process exited. Get output.
-        stdout, stderr = proc.communicate()
-        if stdout:
-            print(f"   📤 stdout: {stdout.decode().strip()}")
-        if stderr:
-            print(f"   ❌ stderr: {stderr.decode().strip()}")
-        print(f"❌ {name} failed to start. The script likely exited without starting the server.")
-        print("   Check that your notebook has app.run() with host='0.0.0.0' and the correct port.")
-        return None
-    else:
-        print(f"✅ {name} is running on port {port}")
-        return proc
+    while True:
+        if proc.poll() is not None:
+            # Process has exited
+            print(f"❌ {name} exited with code {proc.returncode}")
+            # Print any remaining output
+            for line in proc.stdout:
+                print(f"   {line.strip()}")
+            return None
+        
+        # Read available output
+        for line in proc.stdout:
+            line = line.strip()
+            if line:
+                print(f"   {line}")
+                output_lines.append(line)
+        
+        # Check if server is likely running
+        if any("Running on" in line or "Dash is running" in line for line in output_lines):
+            print(f"✅ {name} appears to be running on port {port}")
+            return proc
+        
+        time.sleep(1)
+        if time.time() - start_time > timeout:
+            print(f"⚠️  {name} took too long to start, but process is still alive.")
+            return proc
+
+    return None
 
 if __name__ == '__main__':
     print("\n" + "="*60)
