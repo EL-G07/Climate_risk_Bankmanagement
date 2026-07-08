@@ -26,13 +26,12 @@ def run_notebook(notebook_path, port, name):
     with open(temp_file, 'w') as f:
         f.write(fixed_content)
 
-    # 3. Execute the fixed Python file with IPython
-    #    Using IPython ensures that the environment is similar to Jupyter.
-    cmd = [
-        'ipython',
-        '-c',
-        f"exec(open('{temp_file}').read())"
-    ]
+    # 3. Execute the fixed Python file with IPython and keep it alive
+    #    Using `-c` with `exec(open(...).read())` is unreliable for long-running processes.
+    #    Instead, we use `ipython` with the `-i` flag to keep the interpreter running.
+    #    However, the simplest and most reliable method is to use `python` directly.
+    #    Let's use `python` to execute the fixed script, as it's more predictable.
+    cmd = ['python', temp_file]
 
     # 4. Start the subprocess and keep it alive
     proc = subprocess.Popen(cmd)
