@@ -4,7 +4,6 @@ import subprocess
 import time
 import sys
 
-
 def run_notebook(notebook_path, port, name):
     """
     Executes a Jupyter notebook as a subprocess and keeps it running.
@@ -37,10 +36,10 @@ def run_notebook(notebook_path, port, name):
 
     # 4. Start the subprocess and keep it alive
     proc = subprocess.Popen(cmd)
-
+    
     # Give the server time to start
     time.sleep(8)
-
+    
     # Check if the process is still running
     if proc.poll() is None:
         print(f"✅ {name} is running on port {port}")
@@ -49,16 +48,15 @@ def run_notebook(notebook_path, port, name):
         print(f"❌ {name} failed to start. Check the logs above.")
         return None
 
-
 if __name__ == '__main__':
-    print("\n" + "=" * 60)
+    print("\n" + "="*60)
     print("  🌍 TANZANIA CLIMATE RISK DASHBOARD")
-    print("=" * 60)
+    print("="*60)
     print("  Deploying with automatic 'null' fix...")
-    print("=" * 60 + "\n")
+    print("="*60 + "\n")
 
     processes = []
-
+    
     # Start Main Dashboard
     proc1 = run_notebook('app_risk.ipynb', 8050, 'Main Dashboard')
     if proc1:
@@ -78,12 +76,12 @@ if __name__ == '__main__':
         print("   Please check the error messages above.")
         sys.exit(1)
 
-    print("\n" + "=" * 60)
+    print("\n" + "="*60)
     print("  ✅ DEPLOYMENT SUCCESSFUL")
-    print("=" * 60)
+    print("="*60)
     print("  Main Dashboard:  http://0.0.0.0:8050")
     print("  Risk Calculator: http://0.0.0.0:8051")
-    print("=" * 60 + "\n")
+    print("="*60 + "\n")
     print("  Press Ctrl+C to stop all servers.\n")
 
     try:
