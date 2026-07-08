@@ -6,7 +6,7 @@ import time
 
 def run_notebook(notebook_path, port, name):
     """
-    Executes a Jupyter notebook as a subprocess and captures errors.
+    Executes a Jupyter notebook as a subprocess and keeps it running.
     """
     print(f"🚀 Starting {name} on port {port}...")
 
@@ -25,20 +25,23 @@ def run_notebook(notebook_path, port, name):
     with open(temp_file, 'w') as f:
         f.write(fixed_content)
 
-    # 3. Execute the file with Popen and capture stderr
+    # 3. Execute with Python directly (more reliable than ipython)
     cmd = ['python', temp_file]
+    
+    # Start the process
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
-    # 4. Wait a moment to see if it crashes immediately
+    # 4. Wait a moment and check if it's still running
     time.sleep(5)
     if proc.poll() is not None:
-        # Process has already exited. Get the error.
-        _, stderr = proc.communicate()
-        error_message = stderr.decode().strip()
-        if error_message:
-            print(f"❌ {name} failed to start. Error:\n{error_message}")
-        else:
-            print(f"❌ {name} failed to start with no error message.")
+        # Process exited. Get output.
+        stdout, stderr = proc.communicate()
+        if stdout:
+            print(f"   📤 stdout: {stdout.decode().strip()}")
+        if stderr:
+            print(f"   ❌ stderr: {stderr.decode().strip()}")
+        print(f"❌ {name} failed to start. The script likely exited without starting the server.")
+        print("   Check that your notebook has app.run() with host='0.0.0.0' and the correct port.")
         return None
     else:
         print(f"✅ {name} is running on port {port}")
