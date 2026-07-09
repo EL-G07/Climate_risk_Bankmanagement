@@ -77,11 +77,13 @@ def main():
 
     dashboard_env = os.environ.copy()
     dashboard_env["PORT"] = DASHBOARD_PORT
+    dashboard_env["PYTHONPATH"] = BASE_DIR + os.pathsep + dashboard_env.get("PYTHONPATH", "")
     dashboard_env.pop("DASH_ROUTES_PATHNAME_PREFIX", None)
     dashboard_env.pop("DASH_REQUESTS_PATHNAME_PREFIX", None)
 
     risk_calc_env = os.environ.copy()
     risk_calc_env["PORT"] = RISK_CALC_PORT
+    risk_calc_env["PYTHONPATH"] = BASE_DIR + os.pathsep + risk_calc_env.get("PYTHONPATH", "")
     risk_calc_env["DASH_ROUTES_PATHNAME_PREFIX"] = "/risk-calc/"
     risk_calc_env["DASH_REQUESTS_PATHNAME_PREFIX"] = "/risk-calc/"
 
