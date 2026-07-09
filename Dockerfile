@@ -24,12 +24,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Use Render's PORT environment variable
-ENV PORT=8050
+# Render sets PORT for you at runtime - this is just a local-dev fallback.
+ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 
-# Expose the ports
-EXPOSE 8050 8051
+# Only ONE port is public (Render exposes a single port per web service).
+# app_risk.ipynb and prediction.ipynb still run on internal ports 8050/8051 -
+# run_app.py starts both plus a reverse proxy on $PORT that routes between them.
+EXPOSE 8080
 
-# Start the application
-CMD ["python", "start_deploy.py"]
+# Start the application (see run_app.py - notebooks are never modified,
+# only converted to throwaway scripts at container startup)
+CMD ["python", "run_app.py"]
