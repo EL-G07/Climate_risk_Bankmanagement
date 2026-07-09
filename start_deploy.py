@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import time
+import importlib.util
 
 def run_notebook(notebook_path, port, name):
     """
@@ -20,19 +21,16 @@ def run_notebook(notebook_path, port, name):
         print(f"❌ Error: {notebook_path} not found.")
         return None
 
-    # 2. Force the server to start by appending the run command
-    fixed_content += f"\n\n# Force server start for deployment\napp.run(host='0.0.0.0', port={port}, debug=False, use_reloader=False)\n"
-
-    # 3. Write the fixed content to a temporary Python file
+    # 2. Write the fixed content to a temporary Python file
     temp_file = notebook_path.replace('.ipynb', '_fixed.py')
     with open(temp_file, 'w') as f:
         f.write(fixed_content)
 
-    # 4. Execute the file with Python and capture output
+    # 3. Execute the file with Python and capture output
     cmd = ['python', '-u', temp_file]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     
-    # 5. Print output in real-time
+    # 4. Print output in real-time and check for errors
     start_time = time.time()
     timeout = 15
     output_lines = []
@@ -51,7 +49,11 @@ def run_notebook(notebook_path, port, name):
             if line:
                 print(f"   {line}")
                 output_lines.append(line)
-                if any("Running on" in line or "Dash is running" in line for line in output_lines):
+                # Look for any error messages
+                if "Error" in line or "Traceback" in line:
+                    print(f"⚠️  Error detected in {name}. Waiting for more output...")
+                # Look for server start confirmation
+                if any("Running on" in line or "Dash is running" in line or "Starting" in line for line in output_lines):
                     server_started = True
         
         if server_started:
@@ -68,7 +70,7 @@ if __name__ == '__main__':
     print("\n" + "="*60)
     print("  🌍 TANZANIA CLIMATE RISK DASHBOARD")
     print("="*60)
-    print("  Deploying with automatic 'null' fix and forced server start...")
+    print("  Deploying with automatic 'null' fix...")
     print("="*60 + "\n")
 
     processes = []
