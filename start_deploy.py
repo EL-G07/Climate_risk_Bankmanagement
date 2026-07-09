@@ -6,7 +6,7 @@ import time
 
 def run_notebook(notebook_path, port, name):
     """
-    Executes a Jupyter notebook as a subprocess and captures output.
+    Executes a Jupyter notebook as a subprocess and forces it to start the server.
     """
     print(f"🚀 Starting {name} on port {port}...")
 
@@ -20,25 +20,27 @@ def run_notebook(notebook_path, port, name):
         print(f"❌ Error: {notebook_path} not found.")
         return None
 
-    # 2. Write the fixed content to a temporary Python file
+    # 2. Force the server to start by appending the run command
+    fixed_content += f"\n\n# Force server start for deployment\napp.run(host='0.0.0.0', port={port}, debug=False, use_reloader=False)\n"
+
+    # 3. Write the fixed content to a temporary Python file
     temp_file = notebook_path.replace('.ipynb', '_fixed.py')
     with open(temp_file, 'w') as f:
         f.write(fixed_content)
 
-    # 3. Execute the file with Python and capture all output
-    cmd = ['python', '-u', temp_file]  # -u for unbuffered output
+    # 4. Execute the file with Python and capture output
+    cmd = ['python', '-u', temp_file]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     
-    # 4. Print output in real-time and check if it stays alive
+    # 5. Print output in real-time
     start_time = time.time()
-    timeout = 10
+    timeout = 15
     output_lines = []
+    server_started = False
     
     while True:
         if proc.poll() is not None:
-            # Process has exited
             print(f"❌ {name} exited with code {proc.returncode}")
-            # Print any remaining output
             for line in proc.stdout:
                 print(f"   {line.strip()}")
             return None
@@ -49,24 +51,24 @@ def run_notebook(notebook_path, port, name):
             if line:
                 print(f"   {line}")
                 output_lines.append(line)
+                if any("Running on" in line or "Dash is running" in line for line in output_lines):
+                    server_started = True
         
-        # Check if server is likely running
-        if any("Running on" in line or "Dash is running" in line for line in output_lines):
-            print(f"✅ {name} appears to be running on port {port}")
+        if server_started:
+            print(f"✅ {name} is running on port {port}")
+            return proc
+        
+        if time.time() - start_time > timeout:
+            print(f"⚠️  {name} took too long, but process is still alive.")
             return proc
         
         time.sleep(1)
-        if time.time() - start_time > timeout:
-            print(f"⚠️  {name} took too long to start, but process is still alive.")
-            return proc
-
-    return None
 
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("  🌍 TANZANIA CLIMATE RISK DASHBOARD")
     print("="*60)
-    print("  Deploying with automatic 'null' fix...")
+    print("  Deploying with automatic 'null' fix and forced server start...")
     print("="*60 + "\n")
 
     processes = []
@@ -99,7 +101,6 @@ if __name__ == '__main__':
     print("  Press Ctrl+C to stop all servers.\n")
 
     try:
-        # Keep the main script running
         for proc in processes:
             proc.wait()
     except KeyboardInterrupt:
