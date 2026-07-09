@@ -39,10 +39,33 @@ try:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     
-    # Try to get the app object
-    app = getattr(module, 'app', None)
+    # Try to get the app object from multiple places
+    app = None
+    
+    # Check if 'app' is in the module
+    if hasattr(module, 'app'):
+        app = module.app
+    else:
+        # Try to find any Dash app in the module
+        for attr_name in dir(module):
+            attr = getattr(module, attr_name)
+            if hasattr(attr, '__class__') and 'Dash' in str(attr.__class__):
+                app = attr
+                print(f"   Found Dash app as: {{attr_name}}")
+                break
+    
+    # If app is still None, try to find it in the module's globals
+    if app is None:
+        # Look for a Dash app in the module's global variables
+        for key, value in module.__dict__.items():
+            if hasattr(value, '__class__') and 'Dash' in str(value.__class__):
+                app = value
+                print(f"   Found Dash app as global: {{key}}")
+                break
+    
     if app is None:
         print("Error: 'app' not found in notebook")
+        print("   Available attributes:", [attr for attr in dir(module) if not attr.startswith('_')])
         sys.exit(1)
     
     # Start the server
@@ -73,13 +96,11 @@ except Exception as e:
     while True:
         if proc.poll() is not None:
             print(f"❌ {name} exited with code {proc.returncode}")
-            # Print any remaining output
             for line in proc.stdout:
                 if line.strip():
                     print(f"   {line.strip()}")
             return None
         
-        # Read available output
         for line in proc.stdout:
             line = line.strip()
             if line:
@@ -106,14 +127,12 @@ if __name__ == '__main__':
 
     processes = []
     
-    # Start Main Dashboard
     proc1 = run_notebook('app_risk.ipynb', 8050, 'Main Dashboard')
     if proc1:
         processes.append(proc1)
     else:
         print("⚠️  Main Dashboard failed. Continuing with Risk Calculator...")
 
-    # Start Risk Calculator
     proc2 = run_notebook('prediction.ipynb', 8051, 'Risk Calculator')
     if proc2:
         processes.append(proc2)
@@ -122,7 +141,6 @@ if __name__ == '__main__':
 
     if not processes:
         print("\n❌ No servers started. Deployment failed.")
-        print("   Check the error messages above.")
         sys.exit(1)
 
     print("\n" + "="*60)
@@ -131,7 +149,6 @@ if __name__ == '__main__':
     print("  Main Dashboard:  http://0.0.0.0:8050")
     print("  Risk Calculator: http://0.0.0.0:8051")
     print("="*60 + "\n")
-    print("  Press Ctrl+C to stop all servers.\n")
 
     try:
         for proc in processes:
