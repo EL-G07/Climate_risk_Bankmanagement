@@ -1,13 +1,13 @@
 # start_deploy.py
 import os
-import subprocess
 import sys
+import subprocess
 import time
 import importlib.util
 
 def run_notebook(notebook_path, port, name):
     """
-    Executes a Jupyter notebook as a subprocess and forces it to start the server.
+    Executes a Jupyter notebook as a module and starts the server.
     """
     print(f"🚀 Starting {name} on port {port}...")
 
@@ -26,21 +26,57 @@ def run_notebook(notebook_path, port, name):
     with open(temp_file, 'w') as f:
         f.write(fixed_content)
 
-    # 3. Execute the file with Python and capture output
-    cmd = ['python', '-u', temp_file]
+    # 3. Create a runner script that imports the module and starts the app
+    runner_code = f'''
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Import the fixed notebook as a module
+try:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("notebook_module", "{temp_file}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    
+    # Try to get the app object
+    app = getattr(module, 'app', None)
+    if app is None:
+        print("Error: 'app' not found in notebook")
+        sys.exit(1)
+    
+    # Start the server
+    print(f"Starting server on port {port}...")
+    app.run(host='0.0.0.0', port={port}, debug=False, use_reloader=False)
+    
+except Exception as e:
+    print(f"Error: {{e}}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+'''
+    
+    # Write the runner
+    runner_file = f"runner_{name.replace(' ', '_')}.py"
+    with open(runner_file, 'w') as f:
+        f.write(runner_code)
+    
+    # 4. Execute the runner with Python
+    cmd = ['python', '-u', runner_file]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     
-    # 4. Print output in real-time and check for errors
+    # 5. Print output in real-time
     start_time = time.time()
     timeout = 15
-    output_lines = []
     server_started = False
     
     while True:
         if proc.poll() is not None:
             print(f"❌ {name} exited with code {proc.returncode}")
+            # Print any remaining output
             for line in proc.stdout:
-                print(f"   {line.strip()}")
+                if line.strip():
+                    print(f"   {line.strip()}")
             return None
         
         # Read available output
@@ -48,12 +84,7 @@ def run_notebook(notebook_path, port, name):
             line = line.strip()
             if line:
                 print(f"   {line}")
-                output_lines.append(line)
-                # Look for any error messages
-                if "Error" in line or "Traceback" in line:
-                    print(f"⚠️  Error detected in {name}. Waiting for more output...")
-                # Look for server start confirmation
-                if any("Running on" in line or "Dash is running" in line or "Starting" in line for line in output_lines):
+                if "Running on" in line or "Starting server" in line:
                     server_started = True
         
         if server_started:
@@ -70,7 +101,7 @@ if __name__ == '__main__':
     print("\n" + "="*60)
     print("  🌍 TANZANIA CLIMATE RISK DASHBOARD")
     print("="*60)
-    print("  Deploying with automatic 'null' fix...")
+    print("  Deploying with importlib wrapper...")
     print("="*60 + "\n")
 
     processes = []
