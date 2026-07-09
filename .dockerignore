@@ -1,0 +1,7 @@
+.git
+*.pyc
+__pycache__
+.venv
+*.ipynb_checkpoints
+.DS_Store
+*.log
