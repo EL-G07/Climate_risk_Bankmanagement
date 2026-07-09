@@ -77,24 +77,24 @@ def main():
 
     dashboard_env = os.environ.copy()
     dashboard_env["PORT"] = DASHBOARD_PORT
-    dashboard_env["PYTHONPATH"] = BASE_DIR + os.pathsep + dashboard_env.get("PYTHONPATH", "")
     dashboard_env.pop("DASH_ROUTES_PATHNAME_PREFIX", None)
     dashboard_env.pop("DASH_REQUESTS_PATHNAME_PREFIX", None)
 
     risk_calc_env = os.environ.copy()
     risk_calc_env["PORT"] = RISK_CALC_PORT
-    risk_calc_env["PYTHONPATH"] = BASE_DIR + os.pathsep + risk_calc_env.get("PYTHONPATH", "")
     risk_calc_env["DASH_ROUTES_PATHNAME_PREFIX"] = "/risk-calc/"
     risk_calc_env["DASH_REQUESTS_PATHNAME_PREFIX"] = "/risk-calc/"
 
+    launcher = os.path.join(BASE_DIR, "_run_notebook_script.py")
+
     print("Starting Main Dashboard (app_risk.ipynb) on internal port", DASHBOARD_PORT, flush=True)
     dashboard_proc = subprocess.Popen(
-        [sys.executable, dashboard_script], cwd=BASE_DIR, env=dashboard_env
+        [sys.executable, launcher, dashboard_script], cwd=BASE_DIR, env=dashboard_env
     )
 
     print("Starting Risk Calculator (prediction.ipynb) on internal port", RISK_CALC_PORT, flush=True)
     risk_calc_proc = subprocess.Popen(
-        [sys.executable, risk_calc_script], cwd=BASE_DIR, env=risk_calc_env
+        [sys.executable, launcher, risk_calc_script], cwd=BASE_DIR, env=risk_calc_env
     )
 
     if not wait_for(DASHBOARD_PORT, "/"):
